@@ -1,0 +1,51 @@
+name: Top up the Buffer queue
+
+on:
+  schedule:
+    # Every 6 hours. The Buffer Free queue holds 10 posts, which is 5 days of runway,
+    # so this is far more often than needed. Extra runs cost nothing and do nothing.
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      dryRun:
+        description: 'Only show what would be added'
+        type: boolean
+        default: false
+
+concurrency:
+  group: buffer-queue
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  topup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check every image is reachable
+        run: node scripts/check-images.mjs
+
+      - name: Top up the queue
+        env:
+          BUFFER_TOKEN: ${{ secrets.BUFFER_TOKEN }}
+        run: node scripts/topup.mjs ${{ inputs.dryRun && '--dry-run' || '' }}
+
+      - name: Save what was scheduled
+        if: ${{ !inputs.dryRun }}
+        run: |
+          if git diff --quiet -- state.json; then
+            echo "no change"
+            exit 0
+          fi
+          git config user.name  "aluvalue-queue-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state.json
+          git commit -m "queue: state after top-up $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push
