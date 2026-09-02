@@ -41,12 +41,17 @@ const alert = (m) => { alerts.push(m); console.error(`ALERT: ${m}`) }
 function fail(m) { console.error(`FAIL: ${m}`); process.exit(1) }
 
 const plan = JSON.parse(await readFile(join(ROOT, 'posts.json'), 'utf8'))
-let state
+// A missing state file is normal on the first run. An unreadable one is not, and it must
+// not pass quietly. Either way the run is safe: the slot check below rebuilds what was lost.
+let state = { created: {}, failed: {}, runs: [] }
+let stateWasBroken = null
 try { state = JSON.parse(await readFile(join(ROOT, 'state.json'), 'utf8')) }
-catch { state = { created: {}, failed: {}, runs: [] } }
+catch (e) { if (e.code !== 'ENOENT') stateWasBroken = e.message }
 state.created ||= {}
 state.failed ||= {}
 state.runs ||= []
+
+if (stateWasBroken) alert(`state.json could not be read (${stateWasBroken}). Rebuilding it from Buffer.`)
 
 const orgId = await getOrganizationId(TOKEN)
 const channels = await getChannels(TOKEN, orgId)
