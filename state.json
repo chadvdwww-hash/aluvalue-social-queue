@@ -1,1 +1,32 @@
-{ "created": {}, "failed": {}, "runs": [] }
+{
+  "created": {
+    "1:instagram": "6a97fce313619f8a331c4155",
+    "1:facebook": "6a97fce313619f8a331c4179",
+    "2:instagram": "6a97fce470e142561e3e91e2",
+    "2:facebook": "6a97fce52d8a6ba7a18ee94d",
+    "3:instagram": "6a97fce562abddd00b7b096f",
+    "3:facebook": "6a97fce62d8a6ba7a18ee984",
+    "4:instagram": "6a97fce727a52df7bc6943fd",
+    "4:facebook": "6a97fce727a52df7bc69442d",
+    "5:instagram": "6a97fce862abddd00b7b09b6",
+    "5:facebook": "6a97fce962abddd00b7b09da"
+  },
+  "failed": {},
+  "runs": [
+    {
+      "at": "2026-09-02T10:39:44.526Z",
+      "dryRun": false,
+      "held": 10,
+      "added": 0,
+      "remaining": 50
+    },
+    {
+      "at": "2026-09-02T10:39:37.153Z",
+      "dryRun": false,
+      "held": 0,
+      "added": 10,
+      "remaining": 50
+    }
+  ],
+  "updatedAt": "2026-09-02T10:39:44.526Z"
+}
