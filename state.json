@@ -28,10 +28,10 @@
       "remaining": 50
     },
     {
-      "at": "2026-09-02T10:39:37.153Z",
+      "at": "2026-09-02T10:44:23.802Z",
       "dryRun": false,
-      "held": 0,
-      "added": 10,
+      "held": 10,
+      "added": 0,
       "remaining": 50
     }
   ],

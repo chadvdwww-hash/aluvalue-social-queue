@@ -33,7 +33,11 @@ const LEAD_MINUTES = Number(process.env.LEAD_MINUTES || 30)
 const HOLDING = ['scheduled', 'needs_approval', 'sending', 'draft']
 
 const log = []
+const alerts = []
 const say = (m) => { log.push(m); console.log(m) }
+// An alert makes the GitHub Action fail. A failed Action emails the repo owner.
+// That is the only way anybody finds out that a post did not go out.
+const alert = (m) => { alerts.push(m); console.error(`ALERT: ${m}`) }
 function fail(m) { console.error(`FAIL: ${m}`); process.exit(1) }
 
 const plan = JSON.parse(await readFile(join(ROOT, 'posts.json'), 'utf8'))
@@ -67,11 +71,16 @@ if (byService.instagram.type === 'profile') {
 const held = await listPosts(TOKEN, orgId, HOLDING)
 const errored = await listPosts(TOKEN, orgId, ['error'])
 const sent = await listPosts(TOKEN, orgId, ['sent'])
-const liveIds = new Set([...held, ...errored, ...sent].map((p) => p.id))
+const all = [...held, ...errored, ...sent]
+const liveIds = new Set(all.map((p) => p.id))
+// A second, stronger guard against a duplicate. Every post in the plan has a unique
+// channel and time. If Buffer already holds a post at that channel and time, it is ours,
+// even if state.json was lost or a run died before it could be written.
+const liveSlots = new Set(all.map((p) => `${p.channelId}|${Date.parse(p.dueAt)}`))
 say(`buffer now holds ${held.length}, sent ${sent.length}, errored ${errored.length}`)
 
 for (const p of errored) {
-  if (Object.values(state.created).includes(p.id)) say(`ERROR post ${p.id} due ${p.dueAt} failed to publish. Check Buffer.`)
+  if (Object.values(state.created).includes(p.id)) alert(`post ${p.id} due ${p.dueAt} failed to publish. Open Buffer and look.`)
 }
 
 // Drop remembered ids that Buffer no longer knows about, so a post deleted by hand is rebuilt.
@@ -87,8 +96,15 @@ for (const post of plan.posts) {
     const key = `${post.day}:${service}`
     if (state.created[key]) continue
     const dueAt = post.schedule[service]
+    const slot = `${byService[service].id}|${Date.parse(dueAt)}`
+    if (liveSlots.has(slot)) {
+      const found = all.find((p) => `${p.channelId}|${Date.parse(p.dueAt)}` === slot)
+      state.created[key] = found.id
+      say(`recovered ${key}, buffer already has ${found.id} (${found.status}) at that time`)
+      continue
+    }
     if (Date.parse(dueAt) < earliest) {
-      if (!state.failed[key]) say(`SKIP ${key} due ${dueAt} is in the past or too soon`)
+      if (!state.failed[key]) alert(`SKIP ${key} due ${dueAt} passed without being scheduled`)
       state.failed[key] = { reason: 'past due', dueAt, seenAt: new Date().toISOString() }
       continue
     }
@@ -111,6 +127,8 @@ for (const job of jobs) {
   if (r.ok) {
     state.created[job.key] = r.post.id
     delete state.failed[job.key]
+    // Save after every single create. If this process dies now, the next run still knows.
+    if (!DRY) await saveState()
     say(`added ${job.key} due ${job.dueAt} -> ${r.post.id} (${r.post.status})`)
     capacity--
     added++
@@ -118,16 +136,26 @@ for (const job of jobs) {
     const m = r.message
     state.failed[job.key] = { reason: m, seenAt: new Date().toISOString() }
     if (/limit|upgrade|plan/i.test(m)) { say(`STOP at ${job.key}: buffer says ${m}`); break }
-    say(`REJECTED ${job.key}: ${m}`)
+    alert(`REJECTED ${job.key}: ${m}`)
   }
 }
 
 const remaining = plan.posts.length * wanted.length - Object.keys(state.created).length
 state.runs.unshift({ at: new Date().toISOString(), dryRun: DRY, held: held.length, added, remaining })
 state.runs = state.runs.slice(0, 60)
-state.updatedAt = new Date().toISOString()
-if (!DRY) await writeFile(join(ROOT, 'state.json'), JSON.stringify(state, null, 2) + '\n')
+if (!DRY) await saveState()
 say(`done. added ${added}. ${Object.keys(state.created).length} scheduled so far, ${remaining} left to go.`)
+
+if (alerts.length) {
+  console.error(`\n${alerts.length} thing(s) need a human:`)
+  for (const a of alerts) console.error(`  - ${a}`)
+  process.exit(1)
+}
+
+async function saveState() {
+  state.updatedAt = new Date().toISOString()
+  await writeFile(join(ROOT, 'state.json'), JSON.stringify(state, null, 2) + '\n')
+}
 
 function buildInput({ post, service, dueAt }, chans) {
   const assets = post.assets.map((a) => ({ image: { url: a.url, metadata: { altText: a.altText } } }))

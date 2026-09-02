@@ -37,8 +37,10 @@ jobs:
           BUFFER_TOKEN: ${{ secrets.BUFFER_TOKEN }}
         run: node scripts/topup.mjs ${{ inputs.dryRun && '--dry-run' || '' }}
 
+      # Save the state even if the top-up step raised an alert, so the posts it did
+      # create are remembered. The job still ends red, so GitHub emails the owner.
       - name: Save what was scheduled
-        if: ${{ !inputs.dryRun }}
+        if: ${{ always() && !inputs.dryRun }}
         run: |
           if git diff --quiet -- state.json; then
             echo "no change"
