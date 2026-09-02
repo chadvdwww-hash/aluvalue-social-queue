@@ -17,7 +17,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { getOrganizationId, getChannels, listPosts, createPost, BufferError } from './buffer.mjs'
+import { getChannels, listPosts, createPost, BufferError } from './buffer.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DRY = process.argv.includes('--dry-run')
@@ -53,18 +53,24 @@ state.runs ||= []
 
 if (stateWasBroken) alert(`state.json could not be read (${stateWasBroken}). Rebuilding it from Buffer.`)
 
-const orgId = await getOrganizationId(TOKEN)
+// The targets are pinned in posts.json by the platform's own id, not by position.
+// "The first organization" and "the first Instagram channel" would silently move
+// if a second one were ever connected.
+const orgId = plan.buffer.organizationId
+const wantedIds = plan.buffer.channels
+const wanted = Object.keys(wantedIds)
+
 const channels = await getChannels(TOKEN, orgId)
 say(`organization ${orgId}, ${channels.length} channels`)
 
 const byService = {}
-for (const c of channels) {
-  if (c.isDisconnected) { say(`WARN channel ${c.name} (${c.service}) is disconnected`); continue }
-  byService[c.service] ||= c
+for (const service of wanted) {
+  const want = String(wantedIds[service])
+  const hits = channels.filter((c) => c.service === service && String(c.serviceId) === want)
+  if (hits.length !== 1) fail(`expected exactly 1 ${service} channel with serviceId ${want}, found ${hits.length}`)
+  if (hits[0].isDisconnected) fail(`${service} channel ${hits[0].name} is disconnected`)
+  byService[service] = hits[0]
 }
-const wanted = ['instagram', 'facebook']
-const missing = wanted.filter((s) => !byService[s])
-if (missing.length) fail(`no connected channel for: ${missing.join(', ')}`)
 for (const s of wanted) say(`${s}: ${byService[s].name} (${byService[s].id}, type ${byService[s].type})`)
 
 // An Instagram channel of type "profile" cannot auto publish. It can only send a
@@ -93,6 +99,7 @@ for (const [key, id] of Object.entries(state.created)) {
   if (!liveIds.has(id)) { say(`forgot ${key}, buffer no longer has post ${id}`); delete state.created[key] }
 }
 
+const before = JSON.stringify(state.created) + JSON.stringify(state.failed)
 const now = Date.now()
 const earliest = now + LEAD_MINUTES * 60000
 const jobs = []
@@ -146,9 +153,16 @@ for (const job of jobs) {
 }
 
 const remaining = plan.posts.length * wanted.length - Object.keys(state.created).length
-state.runs.unshift({ at: new Date().toISOString(), dryRun: DRY, held: held.length, added, remaining })
-state.runs = state.runs.slice(0, 60)
-if (!DRY) await saveState()
+// Only record a run that changed something. A log line every 6 hours for 34 days would be
+// 136 pointless commits, and every commit is another chance for a push to conflict.
+const changed = JSON.stringify(state.created) + JSON.stringify(state.failed) !== before
+if (changed) {
+  state.runs.unshift({ at: new Date().toISOString(), dryRun: DRY, held: held.length, added, remaining })
+  state.runs = state.runs.slice(0, 60)
+  if (!DRY) await saveState()
+} else {
+  say('nothing changed, state.json left alone')
+}
 say(`done. added ${added}. ${Object.keys(state.created).length} scheduled so far, ${remaining} left to go.`)
 
 if (alerts.length) {

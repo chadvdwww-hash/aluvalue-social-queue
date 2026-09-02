@@ -36,7 +36,9 @@ The link must stay alive until 6 October 2026. A public GitHub repo does that fo
 - It never creates the same post twice. `state.json` remembers every Buffer post id.
 - It never posts early. Buffer publishes at the time in `posts.json`.
 - It skips any post whose time has already passed, and says so.
-- It reads the channel list fresh every run, because Buffer channel ids change when a channel is reconnected.
+- It reads the channel list fresh every run, because Buffer channel ids change when a channel is reconnected,
+  and it matches on the platform's own id pinned in `posts.json`, never on "the first one it finds".
+- Picture links are pinned to a commit, not to `main`, so a later change cannot break a scheduled post.
 - It stops if Instagram is connected as a personal profile, because Buffer cannot auto post to one.
 - It stops politely when Buffer says the plan limit is reached, and tries again next run.
 
