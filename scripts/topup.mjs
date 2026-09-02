@@ -161,7 +161,9 @@ function buildInput({ post, service, dueAt }, chans) {
   const assets = post.assets.map((a) => ({ image: { url: a.url, metadata: { altText: a.altText } } }))
   const metadata =
     service === 'instagram'
-      ? { instagram: { type: post.postType === 'carousel' ? 'carousel' : 'post', shouldShareToFeed: true, isAiGenerated: !!post.aiAssisted } }
+      // Instagram has no 'carousel' post type in this API. Buffer rejects it.
+      // Several pictures on a post of type 'post' IS the carousel. Verified 2 Sep 2026.
+      ? { instagram: { type: 'post', shouldShareToFeed: true, isAiGenerated: !!post.aiAssisted } }
       : { facebook: { type: 'post' } }
   return {
     channelId: chans[service].id,
