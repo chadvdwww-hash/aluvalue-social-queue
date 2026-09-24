@@ -43,10 +43,19 @@
     "21:instagram": "6ab2b3a21b467b83d9183b41",
     "21:facebook": "6ab2b3a31b467b83d9183b69",
     "22:instagram": "6ab40593b425cfcccc806034",
-    "22:facebook": "6ab40596c2e0e25bec6c5107"
+    "22:facebook": "6ab40596c2e0e25bec6c5107",
+    "23:instagram": "6ab559d7f2f88235921afcff",
+    "23:facebook": "6ab559d87cb0c4ddfc0a1774"
   },
   "failed": {},
   "runs": [
+    {
+      "at": "2026-09-24T17:11:52.364Z",
+      "dryRun": false,
+      "held": 8,
+      "added": 2,
+      "remaining": 14
+    },
     {
       "at": "2026-09-23T17:00:10.858Z",
       "dryRun": false,
@@ -202,5 +211,5 @@
       "remaining": 50
     }
   ],
-  "updatedAt": "2026-09-23T17:00:10.858Z"
+  "updatedAt": "2026-09-24T17:11:52.364Z"
 }
